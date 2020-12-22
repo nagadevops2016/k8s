@@ -1,0 +1,175 @@
+install kubernetes on centos-7
+--------------------------------
+
+Installing Docker on CentOS 7 With Yum
+Installing from Docker repositories using the yum command is the easiest and most popular method.
+
+Step 1: Update Docker Package Database
+In a terminal window, type:
+
+sudo yum check-update
+
+Allow the operation to complete.
+
+Step 2: Install the Dependencies
+The next step is to download the dependencies required for installing Docker.
+
+Type in the following command:
+
+sudo yum install -y yum-utils device-mapper-persistent-data lvm2
+
+The –y switch indicates to the yum installer to answer “yes” to any prompts that may come up. The yum-utils switch adds the yum-config-manager. Docker uses a device mapper storage driver, and the device-mapper-persistent-data and lvm2 packages are required for it to run correctly.
+
+The command for installing Docker dependencies on CentOS 7.
+Step 3: Add the Docker Repository to CentOS
+To install the edge or test versions of Docker, you need to add the Docker CE stable repository to your system. To do so, run the command:
+
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+A command for adding the Docker CE stable repository to CentOS 7.
+A stable release is tested more thoroughly and has a slower update cycle. On the other hand, Edge release updates are more frequent but aren’t subject to as many stability tests.
+
+Note: If you’re only going to use the stable release, don’t enable these extra repositories. The Docker installation process defaults to the latest version of Docker unless you specify otherwise. Leaving the stable repository enabled makes sure that you aren’t accidentally updating from a stable release to an edge release.
+
+Step 4: Install Docker On CentOS Using Yum
+With everything set, you can finally move on to installing Docker on CentOS 7 by running:
+
+sudo yum install docker
+The system should begin the installation. Once it finishes, it will notify you the installation is complete and which version of Docker is now running on your system.
+
+Output confirming Docker has been installed on your CentOS 7.
+Your operating system may ask you to accept the GPG key. This is like a digital fingerprint, so you know whether to trust the installation.
+
+The fingerprint should match the following format:
+
+060A 61C5 1B55 8A7F 742B 77AA C52F EB6B 621E 9F35
+
+Step: 5 Manage Docker Service
+Although you have installed Docker on CentOS, the service is still not running.
+
+To start the service, enable it to run at startup. Run the following commands in the order listed below.
+
+Start Docker:
+
+sudo systemctl start docker
+
+Enable Docker:
+
+sudo systemctl enable docker
+
+Check the status of the service with:
+
+sudo systemctl status docker0
+
+===============================================================
+
+install kubernetes on centos 7
+
+Step 1: Configure Kubernetes Repository
+Kubernetes packages are not available from official CentOS 7 repositories. This step needs to be performed on the Master Node, and each Worker Node you plan on utilizing for your container setup. Enter the following command to retrieve the Kubernetes repositories.
+
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+Note: If using the sudo command, append it not only to the cat command but to the restricted file as well.
+
+Step 2: Install kubelet, kubeadm, and kubectl
+These 3 basic packages are required to be able to use Kubernetes. Install the following package(s) on each node:
+
+sudo yum install -y kubelet kubeadm kubectl
+systemctl enable kubelet
+systemctl start kubelet
+You have now successfully installed Kubernetes, including its tools and basic packages.
+
+System confirms that you have installed kubeadm, kubectl and kubelet
+Before deploying a cluster, make sure to set hostnames, configure the firewall, and kernel settings.
+
+Step 3: Set Hostname on Nodes
+To give a unique hostname to each of your nodes, use this command:
+
+sudo hostnamectl set-hostname master-node
+or
+
+sudo hostnamectl set-hostname worker-node1
+In this example, the master node is now named master-node, while a worker node is named worker-node1.
+
+Make a host entry or DNS record to resolve the hostname for all nodes:
+
+sudo vi /etc/hosts
+With the entry:
+
+192.168.1.10 master.phoenixnap.com master-node
+192.168.1.20 node1. phoenixnap.com node1 worker-node
+Step 4: Configure Firewall
+The nodes, containers, and pods need to be able to communicate across the cluster to perform their functions. Firewalld is enabled in CentOS by default on the front-end. Add the following ports by entering the listed commands.
+
+On the Master Node enter:
+
+sudo firewall-cmd --permanent --add-port=6443/tcp
+sudo firewall-cmd --permanent --add-port=2379-2380/tcp
+sudo firewall-cmd --permanent --add-port=10250/tcp
+sudo firewall-cmd --permanent --add-port=10251/tcp
+sudo firewall-cmd --permanent --add-port=10252/tcp
+sudo firewall-cmd --permanent --add-port=10255/tcp
+sudo firewall-cmd --reload
+Each time a port is added the system confirms with a ‘success’ message.
+
+Adding ports to firewalld exceptions
+Enter the following commands on each worker node:
+
+sudo firewall-cmd --permanent --add-port=10251/tcp
+sudo firewall-cmd --permanent --add-port=10255/tcp
+firewall-cmd --reload
+Step 5: Update Iptables Settings
+Set the net.bridge.bridge-nf-call-iptables to ‘1’ in your sysctl config file. This ensures that packets are properly processed by IP tables during filtering and port forwarding.
+
+cat <<EOF > /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+sysctl --system
+Step 6: Disable SELinux
+The containers need to access the host filesystem. SELinux needs to be set to permissive mode, which effectively disables its security functions.
+
+Use following commands to disable SELinux:
+
+sudo setenforce 0
+sudo sed -i ‘s/^SELINUX=enforcing$/SELINUX=permissive/’ /etc/selinux/config
+Step 7: Disable SWAP
+Lastly, we need to disable SWAP to enable the kubelet to work properly:
+
+sudo sed -i '/swap/d' /etc/fstab
+sudo swapoff -a
+How to Deploy a Kubernetes Cluster
+Step 1: Create Cluster with kubeadm
+Initialize a cluster by executing the following command:
+
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+The process might take several minutes to complete based on network speed. Once this command finishes, it displays a kubeadm join message. Make a note of the entry and use it to join worker nodes to the cluster at a later stage.
+
+Note: This tutorial uses the flannel virtual network add-on. The 10.244.0.0/16 network value reflects the configuration of the kube-flannel.yml file. If you plan to use a different third-party provider, change the --pod-network-cidr value to match your provider's requirements.
+
+Step 2: Manage Cluster as Regular User
+To start using the cluster you need to run it as a regular user by typing:
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+Step 3: Set Up Pod Network
+A Pod Network allows nodes within the cluster to communicate. There are several available Kubernetes networking options. Use the following command to install the flannel pod network add-on:
+
+sudo kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+If you decide to use flannel, edit your firewall rules to allow traffic for the flannel default port 8285.
+
+Step 4: Check Status of Cluster
+Check the status of the nodes by entering the following command on the master server:
+
+sudo kubectl get nodes
+Once a pod network has been installed, you can confirm that it is working by checking that the CoreDNS pod is running by typing:
+
+sudo kubectl get pods --all-namespaces
