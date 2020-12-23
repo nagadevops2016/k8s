@@ -173,3 +173,27 @@ sudo kubectl get nodes
 Once a pod network has been installed, you can confirm that it is working by checking that the CoreDNS pod is running by typing:
 
 sudo kubectl get pods --all-namespaces
+
+Creating a New Token
+Using the kubeadm command, list your current tokens on the Master node. If your cluster was initialized over 24-hour ago, the list will likely be empty, since a token’s lifespan is only 24-hours.
+
+kubeadm tokens list
+
+Create a new token using kubeadm. By using the –print-join-command argument kubeadm will output the token and SHA hash required to securely communicate with the master.
+
+kubeadm token create --print-join-command
+
+Use kubeadm to list all tokens in order to verify our new one.
+
+kubeadm tokens list
+
+Joining the New Worker to the Cluster
+With our new token in hand it is time to join our worker to the cluster.
+
+Using SSH, log onto the new worker node.
+Use the kubeadm join command with our new token to join the node to our cluster.
+
+kubeadm join 192.168.1.130:6443 --token qt57zu.wuvqh64un13trr7x --discovery-token-ca-cert-hash sha256:5ad014cad868fdfe9388d5b33796cf40fc1e8c2b3dccaebff0b066a0532e8723
+
+List your cluster’s nodes to verify your new worker has successfully joined the cluster.
+kubectl get nodes
